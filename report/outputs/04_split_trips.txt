@@ -1,0 +1,9 @@
+split  drive_id  trips                                     frames
+-----  --------  ----------------------------------------  ------
+test   drive_a   trip-07900, trip-08888                    63    
+test   drive_b   trip-02736, trip-06667                    82    
+train  drive_a   trip-00003, trip-02086, trip-02097, trip  288   
+train  drive_b   trip-00722, trip-03365, trip-04237, trip  438   
+val    drive_a   trip-04868, trip-09608                    85    
+val    drive_b   trip-01037, trip-02689                    63    
+[exit 0]

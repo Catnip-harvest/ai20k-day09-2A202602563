@@ -15,8 +15,8 @@ Môi trường chạy: máy cá nhân (Windows) không có Docker, nên mình ch
 
 ## Kết quả cuối
 
-- `dataset_version` của bạn: `<điền>`  (phải khớp `report/evidence/run_summary.json`)
-- Số khung hình train / val / test của bạn: `<điền>`
+- `dataset_version` của bạn: `007d1c50120a`  (phải khớp `report/evidence/run_summary.json`)
+- Số khung hình train / val / test của bạn: `726 / 148 / 145` (tổng 1019 khung; 18 / 4 / 4 trip)
 - `report/verify.txt`: tạo bằng `python3 scripts/check_submission.py --save-verify` (phải có `27/27 checks passed`).
 - Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `minio_lake.png`, `metabase_dashboard.png`, và ảnh bài tập sập/chạy lại (log task đỏ thấy trip của bạn).
 
@@ -87,17 +87,33 @@ Mình giữ ngưỡng **2**. Ngưỡng 0 bỏ sót camera đứng hình có nhi�
 ### Câu 6
 Dựa vào `leakage.json`: chia theo khung hình làm bao nhiêu trip bị chia cắt, so với chia theo trip? Vì sao điều này làm điểm kiểm thử đẹp một cách giả tạo?
 
-(trả lời ở đây)
+Có 1019 khung đáng dùng thuộc 26 trip. Chia **theo khung hình** (ngẫu nhiên 70/15/15): **26/26 trip** nằm ở nhiều hơn một split, và cả **26 trip có khung ở cả train lẫn test**. Chia **theo trip** (gold của pipeline): **0 trip** bị chia cắt; test `no_straddle` trong dbt và verify "no trip is in two splits" đều PASS.
+
+Hai khung liền nhau cách 0,5 s gần như giống hệt (cùng đường, cùng xe phía trước, cùng ánh sáng). Nếu khung t ở train và khung t+1 ở test, mô hình chỉ cần "nhớ" cảnh là đoán đúng: điểm test đo khả năng nhớ, không đo khả năng tổng quát hoá sang con đường mới. Khi triển khai trên đoạn đường chưa thấy, điểm thật sẽ thấp hơn nhiều so với con số báo cáo.
 
 ### Câu 7
 Vì sao `dataset_version` là **băm nội dung** chứ không phải ngày giờ hay số đếm? Hai lần chạy liên tiếp cho kết quả gì? Vì sao `dataset_version` của bạn **khác** bạn bè dù cùng dữ liệu (liên hệ MSSV)?
 
-(trả lời ở đây)
+`export_dataset` lấy sha256 của danh sách `frame_id|split` đã sắp xếp, cắt 12 ký tự. Cùng nội dung thì cùng tên: chạy lại không đẻ ra "phiên bản mới" giả, hai người ở hai máy có thể so dataset bằng một chuỗi, và chỉ cần một khung đổi split là version đổi. Ngày giờ hay số đếm đổi mỗi lần chạy dù dữ liệu y hệt, nên không trả lời được "hai dataset này có giống nhau không".
+
+Mình chạy `step 4` rồi `cli export-dataset` thêm **hai lần**: cả ba đều `007d1c50120a`, `manifest_sha256` cũng giống hệt (`49ef2dbe…`). DAG Airflow chạy từ lake trống và lần `step all --reset` cuối cùng cũng ra `007d1c50120a`.
+
+MSSV được nối vào `md5(trip_id || LAB_STUDENT_ID)` để xếp thứ tự trip trong mỗi drive, nên cùng dữ liệu nhưng MSSV khác thì trip rơi vào split khác. Mình thử `LAB_STUDENT_ID=2024000` (giá trị mẫu trong `.env.example`): version thành `8fc131884584`, split 703 / 182 / 134 thay vì 726 / 148 / 145, số trip vẫn 18 / 4 / 4. Đặt lại MSSV của mình thì quay về `007d1c50120a`.
 
 ### Câu 8
 Đọc phần `lineage` trong `manifest.json` của dataset bạn. Trả lời "dataset này được tạo từ dữ liệu nào?" bằng chính nội dung đó. Nếu một người hỏi 3 tháng sau, thông tin nào giúp tái tạo lại đúng dataset này?
 
-(trả lời ở đây)
+`lake/gold/datasets/007d1c50120a/manifest.json` (lần chạy DAG từ lake trống) ghi:
+
+```json
+"lineage": {"bronze.raw_telemetry_a": 0, "bronze.raw_telemetry_b": 0, "bronze.trips_raw": 0, "bronze.video_files": 1,
+            "silver.frames": 25, "silver.telemetry": 0, "silver.frames_flagged": 0, "silver.frame_telemetry": 0,
+            "input_video_sha256": {"drive_a": "636ba1a98dfc…", "drive_b": "bfa62703f645…"}}
+```
+
+Tức là: dataset được tạo từ hai video có sha256 `636ba1a98dfc5ba6…` (drive_a) và `bfa62703f645ff77…` (drive_b), từ version 0 của hai bảng telemetry thô và bảng trips, version 1 của `bronze.video_files` (hai lần ghi, mỗi drive một lần), và version 25 của `silver.frames` (26 lần ghi, mỗi trip một partition). Manifest còn ghi luật lọc (`is_black, is_blurry, is_near_dup, not sync_ok`), cách chia (`per trip, stratified by drive, md5 order`), `by_split`, `manifest_sha256` và `manifest.parquet` liệt kê từng ảnh.
+
+Để tái tạo sau 3 tháng cần: sha256 video đầu vào, version của từng bảng Delta (time travel về đúng version đó), commit Git của mã pipeline/dbt (ngưỡng trong `dbt_project.yml`) và MSSV dùng làm salt. Có đủ những thứ đó thì chạy lại phải ra cùng `007d1c50120a`; ra khác là biết ngay có gì đã đổi.
 
 ## Bước 5 · Điều phối và phục vụ
 
