@@ -1,0 +1,2 @@
+[{"version": 1, "operation": "WRITE", "rows_added": 1, "predicate": null}, {"version": 0, "operation": "WRITE", "rows_added": 1, "predicate": null}]
+[exit 0]

@@ -1,0 +1,9 @@
+  ĐÚNG    data/drive_a.mp4  (12.0 MB)
+  ĐÚNG    data/drive_b.mp4  (15.3 MB)
+  ĐÚNG    data/sources.json  (0.0 MB)
+  ĐÚNG    data/telemetry_a.csv  (0.3 MB)
+  ĐÚNG    data/telemetry_b.csv  (0.3 MB)
+  ĐÚNG    data/trips.csv  (0.0 MB)
+
+Dữ liệu đầy đủ (6/6 file khớp bản chuẩn). Sẵn sàng: docker compose --profile orchestrate up -d
+[exit 0]

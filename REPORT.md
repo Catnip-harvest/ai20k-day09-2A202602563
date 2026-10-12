@@ -4,10 +4,14 @@
 
 | | |
 |---|---|
-| Họ và tên | `<điền>` |
-| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `<điền>` |
-| GitHub | `<điền: tên tài khoản>` |
-| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
+| Họ và tên | Hoàng Quốc Việt |
+| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `2A202602563` |
+| GitHub | `Catnip-harvest` |
+| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `trip-02134` |
+
+Cách tính trip: MSSV của mình có chữ `A` nên `int("2A202602563")` trong lệnh của GUIDE báo lỗi. Mình bỏ ký tự không phải số và dùng `2202602563 % 26 = 5`; phần tử thứ 5 (đếm từ 0) của `scripts/lab.sh cli list-trips` là `trip-02134`, cũng là `map_index=5` của `silver_frames` trong Airflow.
+
+Môi trường chạy: máy cá nhân (Windows) không có Docker, nên mình chạy đúng `docker-compose.yml` của đề trên một máy Ubuntu có Docker (GitHub Actions runner), không sửa mã của đề. Mọi lệnh và đầu ra lưu theo từng bước; ảnh chụp là giao diện thật của Airflow, MinIO và Metabase trên máy đó.
 
 ## Kết quả cuối
 
@@ -21,7 +25,17 @@
 ### Câu 1
 Liệt kê **ít nhất 4 khác biệt** giữa telemetry nguồn A và nguồn B mà bạn thấy ở bronze. Vì sao pipeline giữ **mỗi nguồn một bảng bronze** và để mọi cột ở dạng chữ, thay vì gộp và ép kiểu ngay?
 
-(trả lời ở đây)
+Khác biệt thấy trong 3 dòng đầu của `lake.bronze_raw_telemetry_a` và `_b`:
+
+| | Nguồn A | Nguồn B |
+|---|---|---|
+| Thời gian | `ts_utc` chuỗi ISO-8601 (`2025-10-07T08:00:00.014Z`) | `timestamp_ms` số epoch mili-giây (`1759933801509`) |
+| Tốc độ | `speed_mps` m/s (`1.213`) | `spd_kmh` km/h (`55.11`) |
+| Bàn đạp | `gas`, `brake` tỉ lệ 0–1 (`0.028`) | `throttle_pct`, `brake_pct` phần trăm (`2.0`) |
+| Tên cột | `heading_deg, lat, lon, alt_m, acc_x, acc_y, steer` | `hdg, latitude, longitude, altitude, ax, ay, steering` |
+| Đồng hồ | lệch 0 ms | chạy **nhanh 1500 ms** so với video (`telemetry_clock_offset_ms = 1500` trong `bronze_video_files`) |
+
+Bronze giữ nguyên bản để luôn có thể dựng lại silver khi luật làm sạch thay đổi: nếu ép kiểu ngay, ô trống ở `speed` (30 dòng mỗi drive) hay giá trị vô lý sẽ bị biến thành NULL/lỗi và mất dấu vết. Hai schema khác nhau nên gộp sớm buộc phải đoán ánh xạ ngay lúc nạp; tách hai bảng thì việc ánh xạ nằm ở một chỗ (staging dbt) và có test. Nạp lại lần hai báo `already present` (video nhận diện bằng sha256), `cli history bronze.raw_telemetry_a` chỉ có **1 commit** (version 0, 3021 dòng), B cũng 1 commit (3234 dòng): chạy lại không nhân đôi.
 
 ## Bước 2 · Silver telemetry
 
