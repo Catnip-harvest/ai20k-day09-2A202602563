@@ -1,0 +1,2 @@
+dashboard: http://localhost:3000/dashboard/2 | login lab@example.com / Day9-lab-pass!
+[exit 0]

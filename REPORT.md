@@ -120,18 +120,43 @@ Tức là: dataset được tạo từ hai video có sha256 `636ba1a98dfc5ba6…
 ### Câu 9
 Mô tả chính xác điều xảy ra khi trip của bạn sập rồi chạy lại: bao nhiêu task chuyển đỏ, bao nhiêu task `upstream_failed`, bạn clear gì, dữ liệu có nhân đôi không, `dataset_version` có đổi không? Bằng chứng (ảnh, số) là gì?
 
-(trả lời ở đây)
+Trước đó, run `green_1` (sau `day09_reset`) xanh toàn bộ 37 task instance (3 bronze + `trip_commands` + 26 `silver_frames` + 7 task sau), `dataset_version` `007d1c50120a` (`airflow_graph.png`). Đặt `LAB_FAIL_ONCE=trip-02134`, áp dụng lại compose, trigger `day09_reset` rồi `day09_video_pipeline` (run `crash_1`):
+
+- **1 task đỏ**: `silver_frames` `map_index=5`, log ghi `RuntimeError: simulated crash while extracting trip-02134; run it again` (`fail_task_log.png`).
+- **7 task `upstream_failed`**: `dbt_run_silver`, `dbt_test_silver`, `dbt_run_gold`, `dbt_test_gold`, `publish_lake`, `export_dataset`, `publish_warehouse` (`airflow_fail_graph.png`).
+- 29 task vẫn **success**, gồm 25 trip còn lại: lỗi của một partition không làm hỏng partition khác.
+
+Mình chỉ clear task đỏ cùng các task phía sau nó (tương đương nút "Clear task" với Downstream + Only failed, chạy bằng `airflow tasks clear day09_video_pipeline -t '^silver_frames$' --only-failed --downstream`). Như vậy 8 task instance chạy lại: lần thử 2 của `trip-02134` ghi `{"trip": "trip-02134", "frames": 60}`, 25 trip kia **không** chạy lại. Run `crash_1` chuyển xanh 37/37 (`airflow_retry_graph.png`). Không nhân đôi: `lake.silver_frames` có 1246 dòng = 1246 `frame_id` khác nhau (bằng số trước khi sập). `scripts/lab.sh verify`: **27/27**, `dataset_version` vẫn **`007d1c50120a`**, giống run `green_1`.
 
 ### Câu 10
 Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipeline này sẽ vỡ đầu tiên, và bạn thay bằng gì (nối với slide 12, 22, 23)?
 
-(trả lời ở đây)
+Ước lượng: một trip trung bình ~48 khung (~24 s ở 2 khung/giây); 2 drive (~11 phút video) đã cho 1246 khung và 26 task. 500 xe × vài giờ lái mỗi ngày là hàng triệu khung và hàng chục nghìn partition mỗi ngày.
+
+1. **Giải mã video và tính đặc trưng trên một container** (`silver_frames`: FFmpeg + numpy, `max_active_tis_per_dagrun=1`, `PARALLELISM=2`, LocalExecutor). Ở đây riêng bước 3 cho 26 trip đã mất ~45 s; tăng hàng trăm lần thì không kịp trong một ngày. Thay bằng worker phân tán (KubernetesExecutor/Celery hoặc Spark/Ray), giải mã bằng GPU (NVDEC), và chỉ chạy partition mới theo ngày (backfill theo partition).
+2. **DuckDB một file + dbt trên một máy** (`work/lakehouse.duckdb`, `silver_frame_telemetry` join toàn bảng). Một tiến trình, một file khoá, RAM của một máy: ASOF join trên hàng trăm triệu dòng telemetry sẽ hết bộ nhớ, và các task không ghi song song được. Thay bằng engine phân tán đọc thẳng Delta (Spark/Trino/Databricks SQL), mô hình dbt dạng incremental theo `drive_id`/ngày.
+3. **Lưu ảnh từng file JPEG nhỏ + Delta ghi theo từng trip trên một MinIO**. Hàng triệu object nhỏ mỗi ngày làm chậm list/copy (`export_dataset` copy từng ảnh), log Delta phình vì mỗi trip một commit, và nhiều task ghi cùng bảng sẽ xung đột commit. Thay bằng object store có scale (S3/GCS), ghi ảnh thành shard lớn (WebDataset/tar hoặc Parquet chứa bytes), partition bảng theo ngày/xe, compaction (OPTIMIZE) định kỳ; warehouse Postgres cho dashboard cũng nên chuyển sang kho cột (BigQuery/ClickHouse).
 
 ## Câu hỏi riêng của bạn trên Metabase
 
 Câu SQL bạn thêm vào dashboard và điều nó cho biết:
 
-(trả lời ở đây)
+```sql
+select split, lighting, count(*) as trips, sum(frames_kept) as frames_kept,
+       round(avg(avg_speed_kmh)::numeric, 1) as avg_speed_kmh
+from marts.mart_trip_summary where split is not null
+group by 1, 2 order by 1, 2
+```
+
+Câu hỏi: train/val/test có cùng phân bố điều kiện ánh sáng không, tức test có đo được mô hình trong mọi điều kiện lái không? Kết quả (thẻ "Câu hỏi riêng" cuối dashboard):
+
+| split | lighting | trips | frames_kept | avg_speed_kmh |
+|---|---|---|---|---|
+| test | Day | 4 | 145 | 42.3 |
+| train | Day | 18 | 726 | 53.8 |
+| val | Day | 4 | 148 | 51.3 |
+
+Diễn giải: cả 26 trip đều gắn nhãn `Day`, nên tập test **không có** trip đêm nào và không thể đo mô hình lúc tối, dù drive B có 61 khung tối (đường hầm, bóng râm) được giữ lại. Test cũng chậm hơn train (42 so với 54 km/h; riêng drive_a test chỉ 11 km/h). Chia theo trip tránh được rò rỉ nhưng không bảo đảm các split cân bằng về điều kiện; với dữ liệu thật nên chia theo trip **có phân tầng** theo ánh sáng và dải tốc độ.
 
 ## Nhìn lại
 

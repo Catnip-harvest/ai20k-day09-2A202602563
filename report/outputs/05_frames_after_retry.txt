@@ -1,0 +1,4 @@
+frames  distinct_frames
+------  ---------------
+1246    1246           
+[exit 0]
