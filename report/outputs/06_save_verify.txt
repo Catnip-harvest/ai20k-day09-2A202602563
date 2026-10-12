@@ -1,0 +1,13 @@
+agrees with the table                 version 007d1c50120a
+  PASS  manifest lists upstream table versions (lineage)                         
+  PASS  every manifest image exists under the dataset version folder             
+
+Module 5 · warehouse
+  PASS  warehouse has the six marts                                              {'mart_trip_summary': 26, 'mart_telemetry_quality': 2, 'mart_split_balance': 3, 'mart_speed_coverage': 7, 'mart_frame_gallery': 1019, 'mart_frame_funnel': 2}
+  PASS  warehouse gallery rows == gold frames                                    
+
+27/27 checks passed
+{"ok": true}
+
+đã lưu report/verify.txt
+[exit 0]

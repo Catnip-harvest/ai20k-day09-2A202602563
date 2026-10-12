@@ -1,0 +1,149 @@
+=== 19:41:09 unpack dataset
+total 27152
+drwxr-xr-x  2 runner runner     4096 Oct 12 19:41 .
+drwxr-xr-x 14 runner runner     4096 Oct 12 19:41 ..
+-rw-r--r--  1 runner runner 27791983 Oct 12 19:41 day09-data.zip
+total 27168
+drwxr-xr-x  2 runner runner     4096 Oct 12 19:41 .
+drwxr-xr-x 14 runner runner     4096 Oct 12 19:41 ..
+-rw-r--r--  1 runner runner     1180 Oct 12 19:40 MANIFEST.json
+-rw-r--r--  1 runner runner      392 Oct 12 19:40 README.md
+-rw-r--r--  1 runner runner 11958062 Oct  9 09:37 drive_a.mp4
+-rw-r--r--  1 runner runner 15270065 Oct  9 09:37 drive_b.mp4
+-rw-r--r--  1 runner runner      598 Oct  9 09:37 sources.json
+-rw-r--r--  1 runner runner   294438 Oct  9 09:37 telemetry_a.csv
+-rw-r--r--  1 runner runner   265524 Oct  9 09:37 telemetry_b.csv
+-rw-r--r--  1 runner runner     2612 Oct  9 09:37 trips.csv
+=== 19:41:09 00_check_data: python3 scripts/check_data.py
+=== 19:41:09 00_check_data exit=0
+=== 19:41:09 00_compose_build: docker compose --profile orchestrate up -d --build
+=== 19:43:11 00_compose_build exit=0
+=== 19:43:56 00_step_all_first: scripts/lab.sh step all --reset
+=== 19:44:53 00_step_all_first exit=0
+=== 19:44:54 my trip = trip-02134 (map_index 5)
+=== 19:44:54 01_step1: scripts/lab.sh step 1 --reset
+=== 19:44:57 01_step1 exit=0
+=== 19:44:57 01_history_a: scripts/lab.sh cli history bronze.raw_telemetry_a
+=== 19:44:58 01_history_a exit=0
+=== 19:44:58 01_history_b: scripts/lab.sh cli history bronze.raw_telemetry_b
+=== 19:44:59 01_history_b exit=0
+=== 19:44:59 01_history_video: scripts/lab.sh cli history bronze.video_files
+=== 19:44:59 01_history_video exit=0
+=== 19:44:59 01_video_files: scripts/lab.sh cli sql select drive_id, telemetry_clock_offset_ms, sha256 from lake.bronze_video_files
+=== 19:45:00 01_video_files exit=0
+=== 19:45:00 01_raw_a: scripts/lab.sh cli sql select * from lake.bronze_raw_telemetry_a limit 3
+=== 19:45:02 01_raw_a exit=0
+=== 19:45:02 01_raw_b: scripts/lab.sh cli sql select * from lake.bronze_raw_telemetry_b limit 3
+=== 19:45:03 01_raw_b exit=0
+=== 19:45:03 01_types_a: scripts/lab.sh cli sql select column_name, data_type from (describe lake.bronze_raw_telemetry_a)
+=== 19:45:04 01_types_a exit=1
+=== 19:45:04 01_types_b: scripts/lab.sh cli sql select column_name, data_type from (describe lake.bronze_raw_telemetry_b)
+=== 19:45:05 01_types_b exit=1
+=== 19:45:05 01_counts: scripts/lab.sh cli sql select 'a' src, count(*) n from lake.bronze_raw_telemetry_a union all select 'b', count(*) from lake.bronze_raw_telemetry_b union all select 'trips', count(*) from lake.bronze_trips_raw
+=== 19:45:06 01_counts exit=0
+=== 19:45:06 02_step2: scripts/lab.sh step 2
+=== 19:45:15 02_step2 exit=0
+=== 19:45:15 02_rejects: scripts/lab.sh cli sql select * from silver.silver_telemetry_rejects limit 5
+=== 19:45:16 02_rejects exit=0
+=== 19:45:16 02_rejects_by_reason: scripts/lab.sh cli sql select drive_id, reject_reason, count(*) as n from silver.silver_telemetry_rejects group by 1, 2 order by 1, 2
+=== 19:45:17 02_rejects_by_reason exit=0
+=== 19:45:17 02_quality: scripts/lab.sh cli sql select * from silver.silver_telemetry_classified limit 0
+=== 19:45:18 02_quality exit=0
+=== 19:45:18 02_start_times: scripts/lab.sh cli sql select drive_id, min(ts) as bat_dau, max(ts) as ket_thuc, count(*) as n, round(max(speed_mps), 2) as max_mps from silver.silver_telemetry group by 1 order by 1
+=== 19:45:19 02_start_times exit=0
+=== 19:45:19 02_break_gate: scripts/lab.sh exp break-gate
+=== 19:45:35 02_break_gate exit=0
+=== 19:45:35 03_step3: scripts/lab.sh step 3
+=== 19:45:59 03_step3 exit=0
+=== 19:45:59 03_unittest: scripts/lab.sh test
+=== 19:46:00 03_unittest exit=0
+=== 19:46:00 03_idempotency: scripts/lab.sh exp idempotency --trip trip-02134
+=== 19:46:03 03_idempotency exit=0
+=== 19:46:03 03_threshold: scripts/lab.sh exp threshold
+=== 19:46:04 03_threshold exit=0
+=== 19:46:04 03_history_frames: scripts/lab.sh cli history silver.frames
+=== 19:46:05 03_history_frames exit=0
+=== 19:46:05 03_dark_vs_black: scripts/lab.sh cli sql select drive_id, count(*) filter (where is_black) as black, count(*) filter (where is_dark and not is_black) as dark_only, round(min(brightness) filter (where is_dark and not is_black), 1) as dark_min_luma, round(max(brightness) filter (where is_black), 1) as black_max_luma from silver.silver_frames_flagged group by 1 order by 1
+=== 19:46:06 03_dark_vs_black exit=0
+=== 19:46:06 03_sync: scripts/lab.sh cli sql select drive_id, round(avg(sync_gap_ms)) as avg_gap_ms, max(sync_gap_ms) as max_gap_ms, count(*) filter (where sync_lost) as sync_lost from silver.silver_frame_telemetry group by 1 order by 1
+=== 19:46:07 03_sync exit=0
+=== 19:46:07 04_step4: scripts/lab.sh step 4
+=== 19:46:25 04_step4 exit=0
+=== 19:46:25 04_export_again: scripts/lab.sh cli export-dataset
+=== 19:46:33 04_export_again exit=0
+=== 19:46:33 04_export_again2: scripts/lab.sh cli export-dataset
+=== 19:46:41 04_export_again2 exit=0
+=== 19:46:41 04_leakage: scripts/lab.sh exp leakage
+=== 19:46:42 04_leakage exit=0
+=== 19:46:42 04_split_trips: scripts/lab.sh cli sql select split, drive_id, string_agg(distinct trip_id, ', ' order by trip_id) as trips, count(*) as frames from gold.gold_dataset_frames group by 1, 2 order by 1, 2 --limit 50
+=== 19:46:44 04_split_trips exit=0
+=== 19:46:44 04_trip_in_two_splits: scripts/lab.sh cli sql select count(*) as trips_in_more_than_one_split from (select trip_id from gold.gold_dataset_frames group by 1 having count(distinct split) > 1)
+=== 19:46:45 04_trip_in_two_splits exit=0
+=== 19:47:36 04_step4_other_id: scripts/lab.sh step 4
+=== 19:47:54 04_step4_other_id exit=0
+=== 19:48:45 04_step4_restored: scripts/lab.sh step 4
+=== 19:49:00 04_step4_restored exit=0
+=== 19:49:00 B0_split_before: scripts/lab.sh cli sql select split, count(*) as frames, count(distinct trip_id) as trips from gold.gold_dataset_frames group by 1 order by 1
+=== 19:49:02 B0_split_before exit=0
+=== 19:49:02 B0_sync_before: scripts/lab.sh cli sql select drive_id, count(*) as frames, count(*) filter (where sync_lost) as sync_lost, count(*) filter (where not is_black and not is_blurry and not is_near_dup and sync_ok) as kept from silver.silver_frame_telemetry group by 1 order by 1
+=== 19:49:03 B0_sync_before exit=0
+=== 19:49:03 B1_split_run: scripts/lab.sh dbt run --select gold_dataset_frames --vars {split_train: 0.5, split_val: 0.25}
+=== 19:49:07 B1_split_run exit=0
+=== 19:49:07 B1_split_after: scripts/lab.sh cli sql select split, count(*) as frames, count(distinct trip_id) as trips from gold.gold_dataset_frames group by 1 order by 1
+=== 19:49:08 B1_split_after exit=0
+=== 19:49:08 B1_split_export: scripts/lab.sh cli export-dataset
+=== 19:49:19 B1_split_export exit=0
+=== 19:49:19 B2_sync_50_run: scripts/lab.sh dbt run --select silver_frame_telemetry+ --vars {sync_tol_ms: 50}
+=== 19:49:23 B2_sync_50_run exit=0
+=== 19:49:23 B2_sync_50_after: scripts/lab.sh cli sql select drive_id, count(*) as frames, count(*) filter (where sync_lost) as sync_lost, count(*) filter (where not is_black and not is_blurry and not is_near_dup and sync_ok) as kept from silver.silver_frame_telemetry group by 1 order by 1
+=== 19:49:24 B2_sync_50_after exit=0
+=== 19:49:24 B2_sync_50_split: scripts/lab.sh cli sql select split, count(*) as frames, count(distinct trip_id) as trips from gold.gold_dataset_frames group by 1 order by 1
+=== 19:49:25 B2_sync_50_split exit=0
+=== 19:49:25 B2_sync_100_run: scripts/lab.sh dbt run --select silver_frame_telemetry+ --vars {sync_tol_ms: 100}
+=== 19:49:30 B2_sync_100_run exit=0
+=== 19:49:30 B2_sync_100_after: scripts/lab.sh cli sql select drive_id, count(*) as frames, count(*) filter (where sync_lost) as sync_lost, count(*) filter (where not is_black and not is_blurry and not is_near_dup and sync_ok) as kept from silver.silver_frame_telemetry group by 1 order by 1
+=== 19:49:31 B2_sync_100_after exit=0
+=== 19:49:31 B2_sync_100_split: scripts/lab.sh cli sql select split, count(*) as frames, count(distinct trip_id) as trips from gold.gold_dataset_frames group by 1 order by 1
+=== 19:49:33 B2_sync_100_split exit=0
+=== 19:49:33 B2_sync_500_run: scripts/lab.sh dbt run --select silver_frame_telemetry+ --vars {sync_tol_ms: 500}
+=== 19:49:37 B2_sync_500_run exit=0
+=== 19:49:37 B2_sync_500_after: scripts/lab.sh cli sql select drive_id, count(*) as frames, count(*) filter (where sync_lost) as sync_lost, count(*) filter (where not is_black and not is_blurry and not is_near_dup and sync_ok) as kept from silver.silver_frame_telemetry group by 1 order by 1
+=== 19:49:38 B2_sync_500_after exit=0
+=== 19:49:38 B2_sync_500_split: scripts/lab.sh cli sql select split, count(*) as frames, count(distinct trip_id) as trips from gold.gold_dataset_frames group by 1 order by 1
+=== 19:49:39 B2_sync_500_split exit=0
+=== 19:49:39 B3_restore_run: scripts/lab.sh dbt run --select silver_frame_telemetry+
+=== 19:49:44 B3_restore_run exit=0
+=== 19:49:44 B3_restore_after: scripts/lab.sh cli sql select drive_id, count(*) as frames, count(*) filter (where sync_lost) as sync_lost, count(*) filter (where not is_black and not is_blurry and not is_near_dup and sync_ok) as kept from silver.silver_frame_telemetry group by 1 order by 1
+=== 19:49:45 B3_restore_after exit=0
+=== 19:49:45 B3_restore_split: scripts/lab.sh cli sql select split, count(*) as frames, count(distinct trip_id) as trips from gold.gold_dataset_frames group by 1 order by 1
+=== 19:49:46 B3_restore_split exit=0
+=== 19:49:46 B3_restore_export: scripts/lab.sh cli export-dataset
+=== 19:49:54 B3_restore_export exit=0
+=== 19:49:54 05_step5: scripts/lab.sh step 5
+=== 19:49:59 05_step5 exit=0
+=== 19:50:26 dag day09_reset run reset_1 -> success
+=== 19:52:20 dag day09_video_pipeline run green_1 -> success
+/home/runner/work/day09-runner/day09-runner/out/05_green_states.json: 37 task instances -> {'success': 37}
+=== 19:53:35 dag day09_reset run reset_2 -> success
+=== 19:54:53 dag day09_video_pipeline run crash_1 -> failed
+/home/runner/work/day09-runner/day09-runner/out/05_crash_states.json: 37 task instances -> {'success': 29, 'upstream_failed': 7, 'failed': 1}
+=== 19:55:14 clear only the failed silver_frames instance (+ its downstream)
+=== 19:55:54 crash_1 after clear -> success
+/home/runner/work/day09-runner/day09-runner/out/05_retry_states.json: 37 task instances -> {'success': 37}
+=== 19:56:07 05_verify_after_retry: scripts/lab.sh verify
+=== 19:56:09 05_verify_after_retry exit=0
+=== 19:56:10 05_frames_after_retry: scripts/lab.sh cli sql select count(*) as frames, count(distinct frame_id) as distinct_frames from lake.silver_frames
+=== 19:56:11 05_frames_after_retry exit=0
+=== 19:57:02 06_final_step_all: scripts/lab.sh step all --reset
+=== 19:57:58 06_final_step_all exit=0
+=== 19:57:58 06_save_verify: python3 scripts/check_submission.py --save-verify
+=== 19:58:00 06_save_verify exit=0
+=== 19:58:00 07_bi_up: docker compose --profile bi up -d
+=== 19:58:23 07_bi_up exit=0
+=== 19:58:23 07_setup_metabase: python3 scripts/setup_metabase.py
+=== 19:59:12 07_setup_metabase exit=0
+=== 19:59:12 07_custom_questions: python3 /home/runner/work/day09-runner/day09-runner/mb_custom.py /home/runner/work/day09-runner/day09-runner/out
+=== 19:59:13 07_custom_questions exit=0
+=== 19:59:57 08_check_submission: python3 scripts/check_submission.py
+=== 19:59:57 08_check_submission exit=1
+=== 20:00:00 done

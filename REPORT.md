@@ -194,4 +194,6 @@ Top 4: `trip-04622` (drive_a, 67.1 km/h, 26/60 giữ lại, **56.7%** bị loạ
 
 Điều bạn thấy bất ngờ nhất, điều gì còn chưa rõ, và một lỗi dữ liệu mà bạn nghĩ pipeline **chưa** bắt được (nếu có). Tối đa 8 dòng.
 
-(trả lời ở đây)
+Bất ngờ nhất: chia ngẫu nhiên theo khung hình làm **cả 26/26 trip** rò rỉ sang test, không phải "một vài trip". Bất ngờ thứ hai: chỉ đổi MSSV đã đổi `dataset_version` và đổi phân bố tốc độ của test (drive_a test 11 km/h với MSSV của mình, 22 km/h với `2024000`). Với 26 trip, việc trip nào rơi vào test ảnh hưởng điểm mạnh hơn mô hình.
+Chưa rõ: khi nào nên tách split theo cả địa điểm (cùng con đường đi nhiều lần), chứ không chỉ theo trip.
+Lỗi pipeline chưa bắt: (1) cả 26 trip mang nhãn `lighting = Day` (lấy từ metadata trip), trong khi 61 khung ở drive B thực tế tối; không test nào đối chiếu nhãn với độ sáng đo được, nên nhãn điều kiện có thể sai mà không ai biết. (2) Độ lệch đồng hồ của B là hằng số khai báo tay (1500 ms); nếu đồng hồ trôi dần trong chuyến, ASOF join vẫn "khớp" trong 150 ms nhưng ghép sai mẫu, và không test nào phát hiện.
