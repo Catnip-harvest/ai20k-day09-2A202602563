@@ -65,18 +65,22 @@ Thí nghiệm `break-gate` nới `max_speed_mps` từ 70 lên 1000: luật làm 
 ### Câu 4
 Dựa vào `idempotency.json`: số dòng trước và sau hai lần chạy lại, và khi ghi kiểu `append`. Vì sao Delta `overwrite` theo partition (một trip) an toàn hơn xoá rồi ghi lại, nhất là khi giữa chừng có lỗi?
 
-(trả lời ở đây)
+Mình chạy lại partition `trip-02134` (trip của mình) hai lần: bảng `silver.frames` **1246 dòng trước, 1246 dòng sau**, dấu vân tay `6c7480dfde7e` → `6c7480dfde7e` (`unchanged: true`). Lịch sử Delta cho thấy hai commit mới (version 26 và 27), mỗi commit `WRITE` 60 dòng với predicate `trip_id = 'trip-02134'`: mỗi lần thay đúng 60 dòng của trip đó. Cùng 60 khung đó ghi kiểu `append` hai lần cho ra **120 dòng (gấp 2)**.
+
+`overwrite` theo predicate là **một commit nguyên tử**: file mới được ghi xong rồi log Delta mới trỏ sang, đồng thời đánh dấu file cũ của trip là đã xoá. Nếu tiến trình chết giữa chừng thì commit không xảy ra, người đọc vẫn thấy phiên bản cũ đầy đủ, và chạy lại cho cùng kết quả. "Xoá rồi ghi" là hai thao tác: chết sau khi xoá và trước khi ghi xong thì bảng **mất** trip đó (hoặc có nửa trip) cho tới khi có người phát hiện; các trip khác chạy song song cũng có thể thấy trạng thái dở dang.
 
 ### Câu 5
 Khung hình **đen** và khung hình **tối** khác nhau thế nào, pipeline xử lý khác nhau ra sao, bạn có đồng ý không? Dựa vào `threshold.json`: nếu chọn ngưỡng 0, 2, 6 thì bao nhiêu khung bị coi là trùng ở mỗi drive? Bạn chọn ngưỡng nào, vì sao, và ngưỡng đó phụ thuộc vào tốc độ xe thế nào?
 
 | dHash khác tối đa | số khung trùng, drive A | số khung trùng, drive B |
 |---|---|---|
-| 0 | | |
-| 2 | | |
-| 6 | | |
+| 0 | 61 | 8 |
+| 2 | 149 | 53 |
+| 6 | 363 | 244 |
 
-(trả lời ở đây)
+Khung **đen** có độ sáng trung bình < 12 (`dark_luma`): không có thông tin (camera che, lỗi cảm biến), bị bỏ; độ sáng lớn nhất của khung đen là 0.0. Khung **tối** có 12 ≤ độ sáng < 40 (`dark_soft`): đường hầm, bóng râm, chiều tối. Đó là điều kiện lái thật, nên chỉ gắn cờ `is_dark` và **giữ lại**. Drive A: 6 đen, 4 tối giữ lại; drive B: 4 đen, **61** tối giữ lại (khung tối mờ nhất của B có độ sáng 12.8, sát ngưỡng). Mình đồng ý: bỏ khung tối thì mô hình chỉ học được ban ngày.
+
+Mình giữ ngưỡng **2**. Ngưỡng 0 bỏ sót camera đứng hình có nhiễu nén (A vẫn còn 149 − 61 = 88 khung gần trùng). Ngưỡng 6 loại 363/602 khung ở A (60%), tức loại cả khung khác nhau thật. Ngưỡng phụ thuộc tốc độ: lấy mẫu 2 khung/giây, xe đi 50 km/h di chuyển ~7 m giữa hai khung nên cảnh đổi nhiều; xe đi 5 km/h chỉ ~0,7 m nên hai khung liền nhau tự nhiên đã gần trùng. A chạy chậm hơn B nên ở mọi ngưỡng A đều có nhiều khung trùng hơn. Hệ thống lớn nên cho ngưỡng (hoặc tốc độ lấy mẫu) theo tốc độ xe thay vì một hằng số.
 
 ## Bước 4 · Gold
 

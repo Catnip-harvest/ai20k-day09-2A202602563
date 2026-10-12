@@ -1,0 +1,5 @@
+drive_id  avg_gap_ms  max_gap_ms  sync_lost
+--------  ----------  ----------  ---------
+drive_a   66.0        2884        7        
+drive_b   73.0        3112        7        
+[exit 0]

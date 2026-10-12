@@ -1,0 +1,5 @@
+drive_id  black  dark_only  dark_min_luma  black_max_luma
+--------  -----  ---------  -------------  --------------
+drive_a   6      4          35.8           0.0           
+drive_b   4      61         12.8           0.0           
+[exit 0]
