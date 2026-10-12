@@ -1,0 +1,5 @@
+drive_id  frames  sync_lost  kept
+--------  ------  ---------  ----
+drive_a   602     6          437 
+drive_b   644     7          583 
+[exit 0]

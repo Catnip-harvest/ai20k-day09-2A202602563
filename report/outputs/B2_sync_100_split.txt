@@ -1,0 +1,6 @@
+split  frames  trips
+-----  ------  -----
+test   107     4    
+train  541     18   
+val    114     4    
+[exit 0]

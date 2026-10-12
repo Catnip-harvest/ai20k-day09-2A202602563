@@ -158,6 +158,38 @@ Câu hỏi: train/val/test có cùng phân bố điều kiện ánh sáng không
 
 Diễn giải: cả 26 trip đều gắn nhãn `Day`, nên tập test **không có** trip đêm nào và không thể đo mô hình lúc tối, dù drive B có 61 khung tối (đường hầm, bóng râm) được giữ lại. Test cũng chậm hơn train (42 so với 54 km/h; riêng drive_a test chỉ 11 km/h). Chia theo trip tránh được rò rỉ nhưng không bảo đảm các split cân bằng về điều kiện; với dữ liệu thật nên chia theo trip **có phân tầng** theo ánh sáng và dải tốc độ.
 
+## Điểm cộng · Thí nghiệm riêng và câu hỏi Metabase thứ hai
+
+**Thí nghiệm 1 · Đổi tỉ lệ split** (`--vars '{split_train: 0.5, split_val: 0.25}'` cho `gold_dataset_frames`, ghi đè biến dbt, không sửa `dbt_project.yml`):
+
+| | train | val | test | `dataset_version` |
+|---|---|---|---|---|
+| Trước (0.70 / 0.15) | 726 khung, 18 trip | 148, 4 trip | 145, 4 trip | `007d1c50120a` |
+| Sau (0.50 / 0.25) | 566, 14 trip | 228, 6 trip | 225, 6 trip | `dde35c1e246b` |
+
+Tổng vẫn 1019 khung; mỗi drive chuyển 2 trip từ train sang val và test (13 trip/drive: 7/3/3 thay vì 9/2/2). Version đổi vì danh sách `frame_id|split` đổi. Chạy lại không có biến ghi đè thì quay về đúng `007d1c50120a`.
+
+**Thí nghiệm 2 · Độ chịu lệch đồng bộ `sync_tol_ms`** (chạy lại `silver_frame_telemetry+`):
+
+| `sync_tol_ms` | mất đồng bộ A / B | giữ lại A / B | khung trong gold |
+|---|---|---|---|
+| 50 | 272 / 328 | 242 / 296 | 538 |
+| 100 | 137 / 187 | 345 / 417 | 762 |
+| **150 (mặc định)** | **7 / 7** | **436 / 583** | **1019** |
+| 500 | 6 / 7 | 437 / 583 | 1020 |
+
+Độ trễ trung bình khung–telemetry là 66 ms (A) và 73 ms (B): telemetry lấy mẫu khoảng 10–13 Hz, nên ngưỡng nhỏ hơn chu kỳ lấy mẫu (50, 100 ms) bỏ oan gần nửa số khung tốt. Từ 150 lên 500 ms chỉ cứu thêm **1 khung**, vì 13 khung còn lại nằm trong các đoạn cảm biến mất tín hiệu 2,9–3,1 s; nới tiếp chỉ gắn tốc độ cũ vào khung. Vì vậy 150 ms là điểm hợp lý. Sau thí nghiệm mình chạy lại với giá trị mặc định (7 / 7, 436 / 583, `007d1c50120a`), rồi chạy `step all --reset` lần cuối để tạo `run_summary.json`.
+
+**Câu hỏi Metabase thứ hai (vận hành): trip nào bị loại nhiều khung nhất?**
+
+```sql
+select trip_id, drive_id, lighting, conditions, avg_speed_kmh, frames, frames_kept,
+       round((100.0 * (frames - frames_kept) / frames)::numeric, 1) as pct_dropped, split
+from marts.mart_trip_summary order by pct_dropped desc, trip_id limit 10
+```
+
+Top 4: `trip-04622` (drive_a, 67.1 km/h, 26/60 giữ lại, **56.7%** bị loại), `trip-03904` (46.1 km/h, 50.0%), `trip-02086` (17.6 km/h, 46.7%), `trip-08888` (6.5 km/h, 40.0%, nằm trong test). 8 trong 10 trip bị loại nhiều nhất thuộc drive_a, khớp funnel của drive_a (149 khung trùng, 6 đen, 9 mờ). Các trip chậm (`trip-08888`, `trip-07774` 12.8 km/h) bị loại vì khung trùng, đúng như Câu 5. Nhưng `trip-04622` chạy nhanh mà vẫn mất 57%, nên nhiều khả năng chứa đoạn camera đứng hình 6 s hoặc các khung đen/mờ của drive_a. Marts hiện chỉ có lý do loại theo **drive** nên không xác nhận được. Đề xuất vận hành: thêm `mart_trip_funnel` (lý do loại theo từng trip) và cảnh báo khi một trip mất > 40% khung, để biết ngay chuyến nào cần kiểm tra camera.
+
 ## Nhìn lại
 
 Điều bạn thấy bất ngờ nhất, điều gì còn chưa rõ, và một lỗi dữ liệu mà bạn nghĩ pipeline **chưa** bắt được (nếu có). Tối đa 8 dòng.

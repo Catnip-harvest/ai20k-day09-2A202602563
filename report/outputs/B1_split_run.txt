@@ -1,0 +1,19 @@
+19:49:04  Running with dbt=1.12.5
+19:49:04  Registered adapter: duckdb=1.11.0
+19:49:05  Unable to do partial parsing because config vars, config profile, or config target have changed
+19:49:06  Found 15 models, 1 operation, 28 data tests, 5 sources, 507 macros
+19:49:06  
+19:49:06  Concurrency: 1 threads (target='dev')
+19:49:06  
+19:49:06  1 of 1 START hook: day09.on-run-start.0 ........................................ [RUN]
+19:49:06  1 of 1 OK hook: day09.on-run-start.0 ........................................... [OK in 0.10s]
+19:49:06  
+19:49:06  1 of 1 START sql table model gold.gold_dataset_frames .......................... [RUN]
+19:49:06  1 of 1 OK created sql table model gold.gold_dataset_frames ..................... [OK in 0.07s]
+19:49:06  
+19:49:06  Finished running 1 project hook, 1 table model in 0 hours 0 minutes and 0.52 seconds (0.52s).
+19:49:06  
+19:49:06  Completed successfully
+19:49:06  
+19:49:06  Done. PASS=2 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=2
+[exit 0]

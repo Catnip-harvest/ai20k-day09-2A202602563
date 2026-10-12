@@ -1,0 +1,31 @@
+19:49:34  Running with dbt=1.12.5
+19:49:34  Registered adapter: duckdb=1.11.0
+19:49:34  Unable to do partial parsing because config vars, config profile, or config target have changed
+19:49:36  Found 15 models, 1 operation, 28 data tests, 5 sources, 507 macros
+19:49:36  
+19:49:36  Concurrency: 1 threads (target='dev')
+19:49:36  
+19:49:36  1 of 1 START hook: day09.on-run-start.0 ........................................ [RUN]
+19:49:36  1 of 1 OK hook: day09.on-run-start.0 ........................................... [OK in 0.10s]
+19:49:36  
+19:49:36  1 of 7 START sql table model silver.silver_frame_telemetry ..................... [RUN]
+19:49:36  1 of 7 OK created sql table model silver.silver_frame_telemetry ................ [OK in 0.07s]
+19:49:36  2 of 7 START sql table model gold.gold_dataset_frames .......................... [RUN]
+19:49:36  2 of 7 OK created sql table model gold.gold_dataset_frames ..................... [OK in 0.02s]
+19:49:36  3 of 7 START sql table model marts.mart_frame_funnel ........................... [RUN]
+19:49:36  3 of 7 OK created sql table model marts.mart_frame_funnel ...................... [OK in 0.02s]
+19:49:36  4 of 7 START sql table model marts.mart_frame_gallery .......................... [RUN]
+19:49:36  4 of 7 OK created sql table model marts.mart_frame_gallery ..................... [OK in 0.02s]
+19:49:36  5 of 7 START sql table model marts.mart_speed_coverage ......................... [RUN]
+19:49:36  5 of 7 OK created sql table model marts.mart_speed_coverage .................... [OK in 0.02s]
+19:49:36  6 of 7 START sql table model marts.mart_split_balance .......................... [RUN]
+19:49:36  6 of 7 OK created sql table model marts.mart_split_balance ..................... [OK in 0.02s]
+19:49:36  7 of 7 START sql table model marts.mart_trip_summary ........................... [RUN]
+19:49:36  7 of 7 OK created sql table model marts.mart_trip_summary ...................... [OK in 0.02s]
+19:49:36  
+19:49:36  Finished running 1 project hook, 7 table models in 0 hours 0 minutes and 0.69 seconds (0.69s).
+19:49:36  
+19:49:36  Completed successfully
+19:49:36  
+19:49:36  Done. PASS=8 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=8
+[exit 0]
