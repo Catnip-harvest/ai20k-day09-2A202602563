@@ -1,0 +1,3 @@
+drive_id  ts  speed_mps  heading_deg  lat  lon  alt_m  acc_x  acc_y  gas  brake  steer  _batch_id  _row_no  copy_no  reject_reason
+--------  --  ---------  -----------  ---  ---  -----  -----  -----  ---  -----  -----  ---------  -------  -------  -------------
+[exit 0]

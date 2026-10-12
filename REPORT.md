@@ -42,12 +42,23 @@ Bronze giữ nguyên bản để luôn có thể dựng lại silver khi luật 
 ### Câu 2
 Pipeline đưa hai nguồn về một schema như thế nào (đơn vị, kiểu thời gian, **độ lệch đồng hồ**)? Bằng chứng nào trong kết quả bước 2 cho thấy đã đúng? Dán bảng quarantine của bạn (số dòng theo từng lý do, từng drive) và giải thích vì sao dòng lỗi vào `rejects` thay vì bị xoá.
 
-(trả lời ở đây)
+`stg_telemetry_b.sql` đổi tên cột về schema của A, chia `spd_kmh / 3.6` để ra m/s, chia pedal `/ 100`, và tính `to_timestamp((timestamp_ms - offset_ms) / 1000.0)` với `offset_ms` lấy từ `bronze.video_files` (1500 ms cho drive_b). A chỉ ép kiểu (`ts_utc` → `timestamptz`, `nullif(speed_mps, '')`). Sau đó `silver_telemetry_classified` `union all by name` hai nguồn và gắn `reject_reason`.
+
+Bằng chứng: dòng sạch đầu tiên của B là `2025-10-08 14:30:00.009`, khớp giờ bắt đầu video `14:30:00` (dòng thô là `1759933801509` = `14:30:01.509`, tức đã trừ đúng 1,5 s; verify: "first sample within 0.5 s of video start" PASS). Tốc độ tối đa sau chuẩn hoá: A 19.82 m/s (71 km/h), B 27.83 m/s (100 km/h), đều hợp lý.
+
+| drive | duplicate | speed_missing | speed_out_of_range | sạch | sạch + cách ly = nhận |
+|---|---|---|---|---|---|
+| drive_a | 20 | 30 | 3 | 2968 | 2968 + 53 = 3021 |
+| drive_b | 20 | 30 | 3 | 3181 | 3181 + 53 = 3234 |
+
+Tổng `silver.telemetry` 6149 dòng, `silver.telemetry_rejects` 106 dòng. Dòng lỗi được giữ kèm lý do để đếm được (biết cảm biến nào hỏng, hỏng bao nhiêu), để kiểm toán "sạch + cách ly = nhận" và để xử lý lại nếu luật sai; xoá im lặng thì không ai biết dữ liệu đã mất.
 
 ### Câu 3
 Vì sao test `max_gap_ms` là `warn` còn `in_range` là `error`? Kết quả thí nghiệm `break-gate` của bạn (`break_gate.json`): test nào bắt được, bao nhiêu dòng, và điều đó cho biết gì về vai trò của "cổng chất lượng"?
 
-(trả lời ở đây)
+`max_gap_ms` (khoảng trống > 1000 ms giữa hai mẫu cùng drive) báo một khiếm khuyết **có thật của thế giới**: cảm biến mất tín hiệu vài giây (khoảng trống đồng bộ lớn nhất mình thấy là 2884 ms ở A, 3112 ms ở B). Dữ liệu vẫn đúng, chỉ thưa hơn, và các khung trong khoảng đó đã bị bỏ ở bước join (`sync_lost` 7 khung mỗi drive), nên chỉ cần cảnh báo (`PASS=6 WARN=1 ERROR=0`). `in_range` (0..70 m/s) bảo vệ một bất biến: tốc độ vô lý trong silver là dữ liệu **sai**, sẽ đi thẳng vào nhãn của dataset, nên phải chặn.
+
+Thí nghiệm `break-gate` nới `max_speed_mps` từ 70 lên 1000: luật làm sạch không còn cách ly gì, nhưng `in_range_silver_telemetry_speed_mps__70__0` **FAIL, bắt được 6 dòng** (đúng 3 + 3 dòng `speed_out_of_range` trước đó bị cách ly), tóm tắt `PASS=5 WARN=1 ERROR=1`. Khôi phục luật: `PASS=6 WARN=1 ERROR=0`. Nghĩa là cổng chất lượng là lớp phòng thủ thứ hai, độc lập với luật làm sạch: khi ai đó sửa nhầm cấu hình, test error dừng DAG (trong Airflow `dbt_test_silver` đỏ thì gold không chạy) trước khi dữ liệu xấu tới gold.
 
 ## Bước 3 · Silver frames
 

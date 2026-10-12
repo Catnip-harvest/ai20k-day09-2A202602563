@@ -1,0 +1,9 @@
+drive_id  reject_reason       n 
+--------  ------------------  --
+drive_a   duplicate           20
+drive_a   speed_missing       30
+drive_a   speed_out_of_range  3 
+drive_b   duplicate           20
+drive_b   speed_missing       30
+drive_b   speed_out_of_range  3 
+[exit 0]
